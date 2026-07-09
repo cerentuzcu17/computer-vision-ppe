@@ -216,3 +216,20 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- Proje-ozel ---
+# Model agirliklari (buyuk binary, otomatik iner)
+model/*.pt
+model/*.onnx
+model/*.engine
+!model/.gitkeep
+
+# Ham veri / test medyasi (buyuk dosyalar repo disi tutulur)
+dataset/*
+!dataset/.gitkeep
+!dataset/README.md
+
+# Calisma ciktilari (islenmis goruntu/video, loglar)
+observe/*
+!observe/.gitkeep
+!observe/README.md
