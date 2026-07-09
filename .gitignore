@@ -217,19 +217,19 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# --- Proje-ozel ---
-# Model agirliklari (buyuk binary, otomatik iner)
+# --- Project-specific ---
+# Model weights (large binaries, auto-download)
 model/*.pt
 model/*.onnx
 model/*.engine
 !model/.gitkeep
 
-# Ham veri / test medyasi (buyuk dosyalar repo disi tutulur)
+# Raw data / test media (large files stay out of the repo)
 dataset/*
 !dataset/.gitkeep
 !dataset/README.md
 
-# Calisma ciktilari (islenmis goruntu/video, loglar)
+# Run outputs (processed images/video, logs)
 observe/*
 !observe/.gitkeep
 !observe/README.md
