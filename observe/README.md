@@ -1,4 +1,4 @@
 # observe/
 
-Çalıştırma çıktıları: işlenmiş görüntü/video (`--save`), loglar, ileride
-metrik/rapor dosyaları. İçerik repoya girmez (bkz. `.gitignore`).
+Run outputs: processed images/videos (`--save`), logs, and future
+metrics/reports. Contents are not committed (see `.gitignore`).

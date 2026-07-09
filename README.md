@@ -1,55 +1,56 @@
 # computer-vision-ppe
 
-Kişi-bazlı baret örtüşme tespiti. Bir görüntüdeki her insanı tespit edip pose
-keypoint'lerine indirger, kafa bölgesini çıkarır; bu kafa bölgesi ile bir
-baret kutusunun örtüşmesi (IoU) üzerinden kişiyi "baretli/baretsiz" etiketler.
-Amaç: kalabalık sahnede bareti doğru kişiye atamak.
+Per-person helmet overlap detection. Detects every person in an image,
+reduces them to pose keypoints, extracts the head region, and matches that
+head region against a helmet box via IoU (Intersection-over-Union) to label
+each person "helmet / no helmet". Goal: correctly assign helmets to people
+in crowded scenes.
 
-## Klasör yapısı
+## Folder structure
 
 ```
 .
-├── core/       # Algoritma mantığı: pose çıkarımı, kafa kutusu, IoU (pose_prototype.py)
-├── dataset/    # Test/örnek girdi medyası (repoya girmez, bkz. .gitignore)
-├── model/      # Model ağırlıkları — .pt dosyaları otomatik iner (repoya girmez)
-├── observe/    # Çalıştırma çıktıları: işlenmiş görüntü/video, loglar (repoya girmez)
-└── ui/         # İleride: görselleştirme / dashboard katmanı (şimdilik boş)
+├── core/       # Algorithm logic: pose inference, head box, IoU (pose_prototype.py)
+├── dataset/    # Sample/test input media (not committed, see .gitignore)
+├── model/      # Model weights — .pt files auto-download here (not committed)
+├── observe/    # Run outputs: processed images/videos, logs (not committed)
+└── ui/         # Future: visualization / dashboard layer (empty for now)
 ```
 
-Bu ayrım, baret modeli ve arayüz eklendikçe her parçanın kendi klasöründe
-büyümesini sağlamak için var: algoritma (`core`), veri (`dataset`/`model`),
-sonuç izleme (`observe`), sunum (`ui`).
+This split exists so each piece can grow in its own folder as the helmet
+model and UI are added: algorithm (`core`), data (`dataset`/`model`), result
+tracking (`observe`), presentation (`ui`).
 
-## Ortam — uv
+## Environment — uv
 
-Proje [uv](https://docs.astral.sh/uv/) ile yönetilir. Python sürümü
-`.python-version` dosyasında pinlenmiştir (**3.12.5**).
+The project is managed with [uv](https://docs.astral.sh/uv/). The Python
+version is pinned in `.python-version` (**3.12.5**).
 
 ```bash
-# Bağımlılıkları kur (pyproject.toml + uv.lock üzerinden, .venv otomatik oluşur)
+# Install dependencies (from pyproject.toml + uv.lock, .venv is created automatically)
 uv sync
 
-# Komutları .venv içinde çalıştır
-uv run core/pose_prototype.py --source dataset/ornek.jpg --save observe/ornek_out.jpg
+# Run commands inside the .venv
+uv run core/pose_prototype.py --source dataset/sample.jpg --save observe/sample_out.jpg
 ```
 
-### Bağımlılıklar
+### Dependencies
 
-- `ultralytics` — YOLO-pose çıkarımı (bkz. aşağıda model ağırlığı notu)
-- `opencv-python` — görüntü/video okuma, çizim
-- `numpy` — geometri hesapları
+- `ultralytics` — YOLO-pose inference (see the model weight note below)
+- `opencv-python` — image/video I/O, drawing
+- `numpy` — geometry math
 
-**Model ağırlığı:** `ultralytics` paketi, `yolo11n-pose.pt` (veya `yolo11s-pose.pt`
-gibi daha büyük varyantlar) ağırlığını ilk çalıştırmada otomatik indirir ve
-`model/` klasörüne kaydeder. Ayrı bir pip bağımlılığı gerekmez; sadece internet
-erişimi ve `model/` klasörüne yazma izni yeterlidir. Daha isabetli ama daha
-yavaş bir model için `--weights model/yolo11s-pose.pt` kullanılabilir.
+**Model weights:** the `ultralytics` package auto-downloads `yolo11n-pose.pt`
+(or larger variants like `yolo11s-pose.pt`) on first run and saves it into
+`model/`. No separate pip dependency is needed — just internet access and
+write permission on `model/`. For a more accurate but slower model, use
+`--weights model/yolo11s-pose.pt`.
 
-## Çalıştırma (core/pose_prototype.py)
+## Running (core/pose_prototype.py)
 
 ```bash
-# Resim
-uv run core/pose_prototype.py --source dataset/ornek.jpg --save observe/ornek_out.jpg
+# Image
+uv run core/pose_prototype.py --source dataset/sample.jpg --save observe/sample_out.jpg
 
 # Video
 uv run core/pose_prototype.py --source dataset/video.mp4 --save observe/video_out.mp4
@@ -58,20 +59,20 @@ uv run core/pose_prototype.py --source dataset/video.mp4 --save observe/video_ou
 uv run core/pose_prototype.py --source 0 --show
 ```
 
-Argümanlar:
+Arguments:
 
-| Bayrak       | Açıklama                                             | Varsayılan               |
-|--------------|-------------------------------------------------------|---------------------------|
-| `--source`   | Resim/video yolu veya webcam için `0`                 | *(zorunlu)*               |
-| `--weights`  | YOLO-pose ağırlığı                                     | `model/yolo11n-pose.pt`  |
-| `--conf`     | Tespit güven eşiği                                     | `0.25`                    |
-| `--save`     | Çıktı dosyası (resim/video)                            | yok                       |
-| `--show`     | Pencerede göster                                       | kapalı                    |
+| Flag         | Description                                            | Default                   |
+|--------------|---------------------------------------------------------|----------------------------|
+| `--source`   | Image/video path, or `0` for webcam                     | *(required)*               |
+| `--weights`  | YOLO-pose weights                                        | `model/yolo11n-pose.pt`   |
+| `--conf`     | Detection confidence threshold                           | `0.25`                     |
+| `--save`     | Output file (image/video)                                | none                        |
+| `--show`     | Show in a window                                          | off                         |
 
-## Durum
+## Status
 
-- [x] YOLO-pose ile kişi + keypoint tespiti
-- [x] Kafa keypoint'lerinden kafa kutusu (fallback: insan kutusunun üst %25'i)
-- [x] `helmet_iou()` iskeleti (baret modeli sonra eklenecek)
-- [ ] Baret tespiti + kafa-baret eşleştirmesi
-- [ ] `ui/` katmanı
+- [x] Person + keypoint detection with YOLO-pose
+- [x] Head box from head keypoints (fallback: top 25% of the person box)
+- [x] `helmet_iou()` skeleton (helmet model to be added later)
+- [ ] Helmet detection + head-to-helmet matching
+- [ ] `ui/` layer
