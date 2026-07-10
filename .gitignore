@@ -224,6 +224,10 @@ model/*.onnx
 model/*.engine
 !model/.gitkeep
 
+# Test/placeholder models (third-party weights, only for validating the pipeline)
+model/test/*
+!model/test/.gitkeep
+
 # Raw data / test media (large files stay out of the repo)
 dataset/*
 !dataset/.gitkeep

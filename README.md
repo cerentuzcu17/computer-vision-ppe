@@ -10,9 +10,14 @@ in crowded scenes.
 
 ```
 .
-├── core/       # Algorithm logic: pose inference, head box, IoU (pose_prototype.py)
+├── core/
+│   ├── entities.py         # Detected "things": Person now, Helmet later
+│   ├── geometry.py         # Pure math: head box from keypoints, IoU
+│   ├── drawing.py          # Turning a Person into pixels / console output
+│   └── pose_prototype.py   # CLI glue: load model, read source, run frames
 ├── dataset/    # Sample/test input media (not committed, see .gitignore)
 ├── model/      # Model weights — .pt files auto-download here (not committed)
+│   └── test/   # Third-party placeholder weights, separate from our own (not committed)
 ├── observe/    # Run outputs: processed images/videos, logs (not committed)
 └── ui/         # Future: visualization / dashboard layer (empty for now)
 ```
@@ -53,8 +58,11 @@ pipeline stays on one consistent model generation.
 
 ### Test hardhat model
 
-Until we train our own, `model/hardhat_yolov8n.pt` is the placeholder we use
-to test the head-box-vs-helmet-box matching logic end to end:
+Until we train our own, `model/test/hardhat_yolov8n.pt` is the placeholder we
+use to test the head-box-vs-helmet-box matching logic end to end. It lives
+under `model/test/`, separate from `model/yolo26n-pose.pt`, so it's obvious
+at a glance which weight is "ours" (the pose model we standardized on) and
+which is a borrowed stand-in we're only using to validate the pipeline:
 
 - Source: [keremberke/yolov8n-hard-hat-detection](https://huggingface.co/keremberke/yolov8n-hard-hat-detection)
   (YOLOv8n, trained on Roboflow's "Hard Hats" dataset — ~19.7k images)
@@ -66,7 +74,7 @@ to test the head-box-vs-helmet-box matching logic end to end:
 Not committed (see `.gitignore`) — download it once per machine:
 
 ```bash
-curl -L -o model/hardhat_yolov8n.pt \
+curl -L -o model/test/hardhat_yolov8n.pt \
   https://huggingface.co/keremberke/yolov8n-hard-hat-detection/resolve/main/best.pt
 ```
 
