@@ -10,9 +10,14 @@ in crowded scenes.
 
 ```
 .
-├── core/       # Algorithm logic: pose inference, head box, IoU (pose_prototype.py)
+├── core/
+│   ├── entities.py         # Detected "things": Person now, Helmet later
+│   ├── geometry.py         # Pure math: head box from keypoints, IoU
+│   ├── drawing.py          # Turning a Person into pixels / console output
+│   └── pose_prototype.py   # CLI glue: load model, read source, run frames
 ├── dataset/    # Sample/test input media (not committed, see .gitignore)
 ├── model/      # Model weights — .pt files auto-download here (not committed)
+│   └── test/   # Third-party placeholder weights, separate from our own (not committed)
 ├── observe/    # Run outputs: processed images/videos, logs (not committed)
 └── ui/         # Future: visualization / dashboard layer (empty for now)
 ```
@@ -40,11 +45,43 @@ uv run core/pose_prototype.py --source dataset/sample.jpg --save observe/sample_
 - `opencv-python` — image/video I/O, drawing
 - `numpy` — geometry math
 
-**Model weights:** the `ultralytics` package auto-downloads `yolo11n-pose.pt`
-(or larger variants like `yolo11s-pose.pt`) on first run and saves it into
-`model/`. No separate pip dependency is needed — just internet access and
-write permission on `model/`. For a more accurate but slower model, use
-`--weights model/yolo11s-pose.pt`.
+**Model weights:** the project standardizes on the **YOLO26** family (the
+successor to YOLO11, NMS-free / `end2end` inference — a good fit for CPU).
+The `ultralytics` package auto-downloads `yolo26n-pose.pt` on first run and
+saves it into `model/`. No separate pip dependency is needed — just internet
+access and write permission on `model/`. For a more accurate but slower
+model, use `--weights model/yolo26s-pose.pt`.
+
+Any other computer-vision component added to this repo later (e.g. the
+helmet detector) should default to a `yolo26*` weight too, so the whole
+pipeline stays on one consistent model generation.
+
+### Test hardhat model
+
+Until we train our own, `model/test/hardhat_yolov8n.pt` is the placeholder we
+use to test the head-box-vs-helmet-box matching logic end to end. It lives
+under `model/test/`, separate from `model/yolo26n-pose.pt`, so it's obvious
+at a glance which weight is "ours" (the pose model we standardized on) and
+which is a borrowed stand-in we're only using to validate the pipeline:
+
+- Source: [keremberke/yolov8n-hard-hat-detection](https://huggingface.co/keremberke/yolov8n-hard-hat-detection)
+  (YOLOv8n, trained on Roboflow's "Hard Hats" dataset — ~19.7k images)
+- Classes: `Hardhat`, `NO-Hardhat`
+- Reported mAP@0.5: 0.836
+- Loads with plain `ultralytics.YOLO(...)` — no extra dependency needed,
+  despite the model card showing the `ultralyticsplus` wrapper
+
+Not committed (see `.gitignore`) — download it once per machine:
+
+```bash
+curl -L -o model/test/hardhat_yolov8n.pt \
+  https://huggingface.co/keremberke/yolov8n-hard-hat-detection/resolve/main/best.pt
+```
+
+This is explicitly a **test/placeholder** weight, not the model we'd ship:
+it's a different YOLO generation (v8, not v26) and its license isn't
+confirmed. Treat it as good enough to validate our own code, not as a
+production hardhat detector.
 
 ## Running (core/pose_prototype.py)
 
@@ -64,7 +101,7 @@ Arguments:
 | Flag         | Description                                            | Default                   |
 |--------------|---------------------------------------------------------|----------------------------|
 | `--source`   | Image/video path, or `0` for webcam                     | *(required)*               |
-| `--weights`  | YOLO-pose weights                                        | `model/yolo11n-pose.pt`   |
+| `--weights`  | YOLO-pose weights                                        | `model/yolo26n-pose.pt`   |
 | `--conf`     | Detection confidence threshold                           | `0.25`                     |
 | `--save`     | Output file (image/video)                                | none                        |
 | `--show`     | Show in a window                                          | off                         |
@@ -74,5 +111,6 @@ Arguments:
 - [x] Person + keypoint detection with YOLO-pose
 - [x] Head box from head keypoints (fallback: top 25% of the person box)
 - [x] `helmet_iou()` skeleton (helmet model to be added later)
-- [ ] Helmet detection + head-to-helmet matching
+- [x] Test hardhat model picked and verified (`model/hardhat_yolov8n.pt`, see above)
+- [ ] Helmet detection + head-to-helmet matching wired into the pipeline
 - [ ] `ui/` layer
