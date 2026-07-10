@@ -40,11 +40,16 @@ uv run core/pose_prototype.py --source dataset/sample.jpg --save observe/sample_
 - `opencv-python` — image/video I/O, drawing
 - `numpy` — geometry math
 
-**Model weights:** the `ultralytics` package auto-downloads `yolo11n-pose.pt`
-(or larger variants like `yolo11s-pose.pt`) on first run and saves it into
-`model/`. No separate pip dependency is needed — just internet access and
-write permission on `model/`. For a more accurate but slower model, use
-`--weights model/yolo11s-pose.pt`.
+**Model weights:** the project standardizes on the **YOLO26** family (the
+successor to YOLO11, NMS-free / `end2end` inference — a good fit for CPU).
+The `ultralytics` package auto-downloads `yolo26n-pose.pt` on first run and
+saves it into `model/`. No separate pip dependency is needed — just internet
+access and write permission on `model/`. For a more accurate but slower
+model, use `--weights model/yolo26s-pose.pt`.
+
+Any other computer-vision component added to this repo later (e.g. the
+helmet detector) should default to a `yolo26*` weight too, so the whole
+pipeline stays on one consistent model generation.
 
 ## Running (core/pose_prototype.py)
 
@@ -64,7 +69,7 @@ Arguments:
 | Flag         | Description                                            | Default                   |
 |--------------|---------------------------------------------------------|----------------------------|
 | `--source`   | Image/video path, or `0` for webcam                     | *(required)*               |
-| `--weights`  | YOLO-pose weights                                        | `model/yolo11n-pose.pt`   |
+| `--weights`  | YOLO-pose weights                                        | `model/yolo26n-pose.pt`   |
 | `--conf`     | Detection confidence threshold                           | `0.25`                     |
 | `--save`     | Output file (image/video)                                | none                        |
 | `--show`     | Show in a window                                          | off                         |
