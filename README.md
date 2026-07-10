@@ -51,6 +51,30 @@ Any other computer-vision component added to this repo later (e.g. the
 helmet detector) should default to a `yolo26*` weight too, so the whole
 pipeline stays on one consistent model generation.
 
+### Test hardhat model
+
+Until we train our own, `model/hardhat_yolov8n.pt` is the placeholder we use
+to test the head-box-vs-helmet-box matching logic end to end:
+
+- Source: [keremberke/yolov8n-hard-hat-detection](https://huggingface.co/keremberke/yolov8n-hard-hat-detection)
+  (YOLOv8n, trained on Roboflow's "Hard Hats" dataset — ~19.7k images)
+- Classes: `Hardhat`, `NO-Hardhat`
+- Reported mAP@0.5: 0.836
+- Loads with plain `ultralytics.YOLO(...)` — no extra dependency needed,
+  despite the model card showing the `ultralyticsplus` wrapper
+
+Not committed (see `.gitignore`) — download it once per machine:
+
+```bash
+curl -L -o model/hardhat_yolov8n.pt \
+  https://huggingface.co/keremberke/yolov8n-hard-hat-detection/resolve/main/best.pt
+```
+
+This is explicitly a **test/placeholder** weight, not the model we'd ship:
+it's a different YOLO generation (v8, not v26) and its license isn't
+confirmed. Treat it as good enough to validate our own code, not as a
+production hardhat detector.
+
 ## Running (core/pose_prototype.py)
 
 ```bash
@@ -79,5 +103,6 @@ Arguments:
 - [x] Person + keypoint detection with YOLO-pose
 - [x] Head box from head keypoints (fallback: top 25% of the person box)
 - [x] `helmet_iou()` skeleton (helmet model to be added later)
-- [ ] Helmet detection + head-to-helmet matching
+- [x] Test hardhat model picked and verified (`model/hardhat_yolov8n.pt`, see above)
+- [ ] Helmet detection + head-to-helmet matching wired into the pipeline
 - [ ] `ui/` layer
