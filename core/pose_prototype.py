@@ -233,7 +233,7 @@ def process_frame(model: YOLO, frame: np.ndarray, confidence_threshold: float) -
 
     return frame
 
-
+# True if the source path's file extension looks like a still image, not a video.
 def looks_like_an_image(source: str) -> bool:
     image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
     return source.lower().endswith(image_extensions)
