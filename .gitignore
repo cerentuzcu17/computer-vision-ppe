@@ -218,15 +218,17 @@ __marimo__/
 .streamlit/secrets.toml
 
 # --- Project-specific ---
-# Model weights (large binaries, auto-download)
-model/*.pt
+# Model weights (.pt) are versioned via Git LFS so every dev gets the exact
+# same models on pull. Derived/exported formats stay out - regenerate locally.
 model/*.onnx
 model/*.engine
 !model/.gitkeep
 
-# Test/placeholder models (third-party weights, only for validating the pipeline)
+# Test/placeholder models (third-party weights, only for validating the pipeline).
+# The .pt weights are shared via LFS; ignore anything else that lands here.
 model/test/*
 !model/test/.gitkeep
+!model/test/*.pt
 
 # Raw data / test media (large files stay out of the repo)
 dataset/*
