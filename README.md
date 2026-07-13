@@ -16,8 +16,8 @@ in crowded scenes.
 │   ├── drawing.py          # Turning a Person into pixels / console output
 │   └── pose_prototype.py   # CLI glue: load model, read source, run frames
 ├── dataset/    # Sample/test input media (not committed, see .gitignore)
-├── model/      # Model weights — .pt files auto-download here (not committed)
-│   └── test/   # Third-party placeholder weights, separate from our own (not committed)
+├── model/      # Model weights — .pt files versioned via Git LFS
+│   └── test/   # Third-party placeholder weights, separate from our own (also LFS)
 ├── observe/    # Run outputs: processed images/videos, logs (not committed)
 └── ui/         # Future: visualization / dashboard layer (empty for now)
 ```
@@ -30,6 +30,16 @@ tracking (`observe`), presentation (`ui`).
 
 The project is managed with [uv](https://docs.astral.sh/uv/). The Python
 version is pinned in `.python-version` (**3.12.5**).
+
+**Prerequisite — Git LFS.** The model weights (`model/*.pt`) are versioned with
+[Git LFS](https://git-lfs.com/), so you must have it installed *before* you
+clone/pull, or you'll get tiny pointer files instead of the real weights:
+
+```bash
+# One-time per machine, then clone (or re-pull) the repo
+git lfs install
+git lfs pull        # if you already cloned before installing LFS
+```
 
 ```bash
 # Install dependencies (from pyproject.toml + uv.lock, .venv is created automatically)
@@ -47,10 +57,11 @@ uv run core/pose_prototype.py --source dataset/sample.jpg --save observe/sample_
 
 **Model weights:** the project standardizes on the **YOLO26** family (the
 successor to YOLO11, NMS-free / `end2end` inference — a good fit for CPU).
-The `ultralytics` package auto-downloads `yolo26n-pose.pt` on first run and
-saves it into `model/`. No separate pip dependency is needed — just internet
-access and write permission on `model/`. For a more accurate but slower
-model, use `--weights model/yolo26s-pose.pt`.
+`yolo26n-pose.pt` is committed via Git LFS, so `git lfs pull` gives you the
+exact same weight every other dev has — no per-machine download needed. (If
+the file is ever missing, `ultralytics` will also auto-download it into
+`model/` on first run.) For a more accurate but slower model, use
+`--weights model/yolo26s-pose.pt`.
 
 Any other computer-vision component added to this repo later (e.g. the
 helmet detector) should default to a `yolo26*` weight too, so the whole
@@ -71,7 +82,8 @@ which is a borrowed stand-in we're only using to validate the pipeline:
 - Loads with plain `ultralytics.YOLO(...)` — no extra dependency needed,
   despite the model card showing the `ultralyticsplus` wrapper
 
-Not committed (see `.gitignore`) — download it once per machine:
+Shared via Git LFS, so `git lfs pull` fetches it with the rest of the repo.
+If you ever need to re-fetch it straight from the source:
 
 ```bash
 curl -L -o model/test/hardhat_yolov8n.pt \
