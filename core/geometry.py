@@ -18,9 +18,18 @@ HEAD_KEYPOINTS = (NOSE, LEFT_EYE, RIGHT_EYE, LEFT_EAR, RIGHT_EAR)
 # trust it enough to use it (could be occluded, could be a bad guess).
 MIN_KEYPOINT_CONFIDENCE = 0.30
 
-# The head keypoints sit near the center of the face, not at the edges of the
-# head, so we need to pad the box outward or it'll look too tight.
-HEAD_BOX_PADDING = 0.20
+# The head keypoints (eyes, ears, nose) all sit on the FACE, but a helmet rests
+# on the crown - above and around the whole skull. So we can't just box the
+# keypoints; we grow that box outward, using the eye-to-ear spread as our unit
+# of scale (it stays sensible even when only two keypoints survive).
+#
+#   - UP: how far above the face keypoints to reach, to cover the crown + a
+#     helmet sitting on top of it. This is the important one for helmet matching.
+#   - DOWN: a little below the lowest face point, for the chin.
+#   - HALF_WIDTH: half the box width, left and right of the face center.
+HEAD_BOX_UP_SPANS = 1.4
+HEAD_BOX_DOWN_SPANS = 0.35
+HEAD_BOX_HALF_WIDTH_SPANS = 0.9
 
 
 def find_head_box(keypoints: np.ndarray, person_box: tuple[int, int, int, int]) -> tuple[tuple[int, int, int, int], int, bool]:
@@ -49,16 +58,18 @@ def find_head_box(keypoints: np.ndarray, person_box: tuple[int, int, int, int]) 
         left, top = points.min(axis=0)
         right, bottom = points.max(axis=0)
 
-        width = max(right - left, 1.0)
-        height = max(bottom - top, 1.0)
-        pad_x = width * HEAD_BOX_PADDING + width * 0.5
-        pad_y = height * HEAD_BOX_PADDING + height * 0.7  # extra room for forehead/chin
+        center_x = (left + right) / 2.0
+        # Our unit of scale: the wider of the horizontal/vertical keypoint spread.
+        # Taking the max keeps two horizontally-aligned eyes (or ears) from
+        # collapsing the box to a thin line - a real problem on people facing
+        # away, where the ears are the only trustworthy head keypoints.
+        span = max(right - left, bottom - top, 1.0)
 
         head_box = (
-            int(round(left - pad_x)),
-            int(round(top - pad_y)),
-            int(round(right + pad_x)),
-            int(round(bottom + pad_y)),
+            int(round(center_x - span * HEAD_BOX_HALF_WIDTH_SPANS)),
+            int(round(top - span * HEAD_BOX_UP_SPANS)),
+            int(round(center_x + span * HEAD_BOX_HALF_WIDTH_SPANS)),
+            int(round(bottom + span * HEAD_BOX_DOWN_SPANS)),
         )
         return clip_to_box(head_box, person_box), len(trusted_points), False
 
