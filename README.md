@@ -19,12 +19,13 @@ in crowded scenes.
 ├── model/      # Model weights — .pt files auto-download here (not committed)
 │   └── test/   # Third-party placeholder weights, separate from our own (not committed)
 ├── observe/    # Run outputs: processed images/videos, logs (not committed)
+├── train/      # Training pipeline for a 14-class PPE detector (see train/README.md)
 └── ui/         # Future: visualization / dashboard layer (empty for now)
 ```
 
 This split exists so each piece can grow in its own folder as the helmet
 model and UI are added: algorithm (`core`), data (`dataset`/`model`), result
-tracking (`observe`), presentation (`ui`).
+tracking (`observe`), presentation (`ui`), model training (`train`).
 
 ## Environment — uv
 

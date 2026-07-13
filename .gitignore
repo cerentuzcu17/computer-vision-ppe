@@ -237,3 +237,18 @@ dataset/*
 observe/*
 !observe/.gitkeep
 !observe/README.md
+
+# Training run outputs (weights, full plots/logs) - see train/README.md
+# for the lightweight per-run summaries that ARE committed under train/test-*/
+/runs/
+
+# Alternate virtualenv (this project's venv is normally uv-managed .venv/)
+/venv313/
+
+# Dataset archive downloads, and pretrained weights that land in the repo
+# root instead of model/ when a script is run from the top level
+/*.zip
+/yolo26*.pt
+
+# Claude Code local tool settings (machine-specific)
+.claude/
