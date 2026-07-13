@@ -2,8 +2,8 @@
 
 Training pipeline for a 14-class PPE object detector (YOLO26), separate from
 `core/pose_prototype.py`'s pose + IoU-matching approach. This directory holds
-the training script and a record of past runs; it does not hold the dataset
-or model weights (see below).
+the training script, the trained weights, and a record of past runs. The
+dataset itself is not committed (see below).
 
 ## Dataset
 
@@ -37,8 +37,8 @@ python train/train.py --model yolo26s.pt --epochs 100 --imgsz 640 --batch 32
 ```
 
 Outputs (weights + full plots/logs) go to `runs/train/<name>/` at the project
-root — also not committed; only the lightweight metrics below are kept here
-as a record.
+root, which is not committed — the trained `best.pt` and the lightweight
+metrics below are copied into `train/test-N/` as the committed record.
 
 ## Past runs
 
@@ -58,8 +58,9 @@ Weakest: `NO-Safety Vest` (~0.22), `Mask` (~0.54), `Safety Cone` (~0.71) —
 likely candidates for more data, augmentation, or class-balancing if this
 model is taken further.
 
-Each `test-N/` folder holds `args.yaml` (full run config), `results.csv`
-(per-epoch metrics), `results.png`, `confusion_matrix(_normalized).png`, and
-the box precision/recall/F1 curves. Weights (`best.pt`/`last.pt`) are not
-included — regenerate them by running `train.py` with the args in
-`test-N/args.yaml`.
+Each `test-N/` folder holds `best.pt` (the trained weights), `args.yaml`
+(full run config), `results.csv` (per-epoch metrics), `results.png`,
+`confusion_matrix(_normalized).png`, and the box precision/recall/F1 curves.
+`test-2/best.pt` is the more recent checkpoint (epoch 75, marginally better
+recall); `test-1/best.pt` comes from the first full 100-epoch run — pick
+either, they're trained from the same seed and converge to the same result.
