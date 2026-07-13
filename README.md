@@ -1,10 +1,18 @@
 # computer-vision-ppe
 
-Per-person helmet overlap detection. Detects every person in an image,
-reduces them to pose keypoints, extracts the head region, and matches that
-head region against a helmet box via IoU (Intersection-over-Union) to label
-each person "helmet / no helmet". Goal: correctly assign helmets to people
-in crowded scenes.
+Per-person PPE (Personal Protective Equipment) detection. Two complementary
+tracks:
+
+1. **Pose + IoU matching** (`core/`) — detect every person, reduce them to
+   pose keypoints, extract the head region, and match it against a helmet box
+   via IoU to label each person "helmet / no helmet". Aimed at correctly
+   assigning helmets to people in crowded scenes.
+2. **Trained PPE detector** (`model/ppe_v1.pt`) — our own 14-class YOLO26 model
+   (hardhat, vest, gloves, goggles, mask, … + `NO-` variants) that detects PPE
+   directly. See its [model card](model/ppe_v1.md).
+
+The plan is to combine them: the trained detector finds PPE boxes, pose gives
+per-person body regions, and the matcher assigns each PPE item to a person.
 
 ## Folder structure
 
@@ -15,16 +23,22 @@ in crowded scenes.
 │   ├── geometry.py         # Pure math: head box from keypoints, IoU
 │   ├── drawing.py          # Turning a Person into pixels / console output
 │   └── pose_prototype.py   # CLI glue: load model, read source, run frames
-├── dataset/    # Sample/test input media (not committed, see .gitignore)
-├── model/      # Model weights — .pt files versioned via Git LFS
-│   └── test/   # Third-party placeholder weights, separate from our own (also LFS)
-├── observe/    # Run outputs: processed images/videos, logs (not committed)
-└── ui/         # Future: visualization / dashboard layer (empty for now)
+├── model/                  # Model weights (.pt via Git LFS)
+│   ├── yolo26n-pose.pt     #   pose model (our standard)
+│   ├── ppe_v1.pt           #   our trained 14-class PPE detector (see ppe_v1.md)
+│   └── test/               #   third-party placeholder weights (hardhat)
+├── train/                  # PPE model training: pipeline, run records, metrics
+│   └── runs/run-1/         #   record behind ppe_v1.pt (weights, curves, args)
+├── test/samples/v1/        # Committed inference test photos (sanity checks)
+├── dataset/                # Raw input media (not committed, see .gitignore)
+├── observe/                # Run outputs: processed images/videos, logs (not committed)
+└── ui/                     # Future: visualization / dashboard layer (empty for now)
 ```
 
-This split exists so each piece can grow in its own folder as the helmet
-model and UI are added: algorithm (`core`), data (`dataset`/`model`), result
-tracking (`observe`), presentation (`ui`).
+This split exists so each piece can grow in its own folder: algorithm
+(`core`), weights (`model`), model training (`train`), fixed test media
+(`test`), scratch data (`dataset`), result tracking (`observe`), presentation
+(`ui`).
 
 ## Environment — uv
 
@@ -67,13 +81,20 @@ Any other computer-vision component added to this repo later (e.g. the
 helmet detector) should default to a `yolo26*` weight too, so the whole
 pipeline stays on one consistent model generation.
 
-### Test hardhat model
+### Trained PPE model — `ppe_v1.pt`
 
-Until we train our own, `model/test/hardhat_yolov8n.pt` is the placeholder we
-use to test the head-box-vs-helmet-box matching logic end to end. It lives
-under `model/test/`, separate from `model/yolo26n-pose.pt`, so it's obvious
-at a glance which weight is "ours" (the pose model we standardized on) and
-which is a borrowed stand-in we're only using to validate the pipeline:
+Our own 14-class PPE detector (YOLO26s), the project's first in-house weight.
+Full details, metrics, and provenance are in its
+[model card](model/ppe_v1.md); the training pipeline and run record live in
+[`train/`](train/README.md).
+
+### Test hardhat model (placeholder, superseded)
+
+Before `ppe_v1.pt` existed, `model/test/hardhat_yolov8n.pt` was the placeholder
+used to validate the head-box-vs-helmet-box matching logic end to end. It's now
+superseded by `ppe_v1.pt` (which covers hardhats and much more) but kept as a
+lightweight 2-class baseline. It lives under `model/test/`, separate from our
+own weights, so it's obvious at a glance which is a borrowed stand-in:
 
 - Source: [keremberke/yolov8n-hard-hat-detection](https://huggingface.co/keremberke/yolov8n-hard-hat-detection)
   (YOLOv8n, trained on Roboflow's "Hard Hats" dataset — ~19.7k images)
