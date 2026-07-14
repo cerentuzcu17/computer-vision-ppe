@@ -235,6 +235,12 @@ dataset/*
 !dataset/.gitkeep
 !dataset/README.md
 
+# Downloaded / derived datasets (e.g. Construction-PPE) — never committed
+datasets/
+
+# External / third-party model weights (e.g. SH17 - non-commercial license) — never committed
+model/external/
+
 # Run outputs (processed images/video, logs)
 observe/*
 !observe/.gitkeep
