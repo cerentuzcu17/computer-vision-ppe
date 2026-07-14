@@ -1,19 +1,20 @@
 """
-Same ROI + IoU matching pipeline, but the detector slot is now the SH17
-YOLOv9-e model instead of the 2-class hardhat placeholder.
+Pose + ROI(head_box) + IoU helmet matching, detector slot = SH17 YOLOv9-e.
 
-Key difference in class semantics:
-  SH17 has separate `helmet` (id 10) and `head` (id 12) classes (no "NO-Hardhat").
-    helmet box matched to a person's head_box -> "helmet"   (wearing one)
-    bare head box matched                     -> "no_helmet" (none detected on the head)
-    nothing matched                           -> "unknown"
+Design (per the pipe spec):
+  - The ANCHOR is the pose face keypoints (nose/eyes/ears). find_head_box turns
+    them into a head ROI; the helmet relationship is established from THAT.
+    (Pose stays central - it's also what we'll use later for KVKK face blurring.)
+  - From SH17 we use ONLY the `helmet` class. We deliberately IGNORE its `head`
+    class - the "no helmet" signal comes from pose, not from SH17.
 
-Conflict rule here is PROVISIONAL (pending the pipe design): if both a helmet and a
-head box land on the same person, we treat it as "helmet" - a detected helmet on the
-head means they're wearing it. (This is the opposite of the safety-first tie-break we
-used for the Hardhat/NO-Hardhat placeholder, because `head` != `NO-Hardhat`.)
+Per-person label:
+  - a `helmet` box matches the head ROI (center-in + IoU)  -> "helmet"
+  - head located from real keypoints but no helmet matched -> "no_helmet"
+  - head could only be guessed (no trustworthy face keypoints, fallback box)
+                                                            -> "unknown"
 
-Output: observe/pipeline_match_sh17/  (annotated + combined vs hardhat + tally)
+Output: observe/pipeline_match_sh17/  (annotated per image + tally)
 """
 from __future__ import annotations
 
@@ -22,7 +23,6 @@ from collections import Counter
 from pathlib import Path
 
 import cv2
-import numpy as np
 from ultralytics import YOLO
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,19 +36,18 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 POSE_W = ROOT / "model" / "yolo26n-pose.pt"
 SH17_W = ROOT / "model" / "external" / "sh17_yolo9e.pt"
-SH17_HELMET, SH17_HEAD = 10, 12          # class ids in the SH17 model
+SH17_HELMET = 10          # the only SH17 class we use (its `head`=12 is ignored)
 
 COLOR = {"helmet": (0, 200, 0), "no_helmet": (0, 0, 230), "unknown": (150, 150, 150)}
 
 
-def detections(model, frame):
-    """Run SH17, keep only helmet / head boxes as (kind, box)."""
-    r = model.predict(frame, conf=CONF, classes=[SH17_HELMET, SH17_HEAD], verbose=False)[0]
+def helmet_boxes(model, frame):
+    """Run SH17, keep ONLY helmet boxes."""
+    r = model.predict(frame, conf=CONF, classes=[SH17_HELMET], verbose=False)[0]
     out = []
     if r.boxes is not None:
         for b in r.boxes:
-            kind = "helmet" if int(b.cls[0]) == SH17_HELMET else "head"
-            out.append((kind, tuple(int(v) for v in b.xyxy[0].tolist())))
+            out.append(tuple(int(v) for v in b.xyxy[0].tolist()))
     return out
 
 
@@ -58,18 +57,13 @@ def center_inside(box, head_box):
     return hx1 <= cx <= hx2 and hy1 <= cy <= hy2
 
 
-def match_one(head_box, dets):
-    """Return (status, matched_box). Provisional: a helmet on the head wins over a bare head."""
-    inside = [(kind, box, intersection_over_union(head_box, box))
-              for kind, box in dets if center_inside(box, head_box)]
-    if not inside:
-        return "unknown", None
-    helmets = [d for d in inside if d[0] == "helmet"]
-    if helmets:
-        best = max(helmets, key=lambda d: d[2])
-        return "helmet", best[1]
-    best = max(inside, key=lambda d: d[2])   # only head boxes left
-    return "no_helmet", best[1]
+def match_one(head_box, is_fallback, helmets):
+    """helmet if a helmet box matches the head ROI; else no_helmet (or unknown if the head was only guessed)."""
+    inside = [(box, intersection_over_union(head_box, box)) for box in helmets if center_inside(box, head_box)]
+    if inside:
+        best = max(inside, key=lambda d: d[1])
+        return "helmet", best[0]
+    return ("unknown" if is_fallback else "no_helmet"), None
 
 
 def draw(frame, pbox, hbox, status, mbox, pid):
@@ -94,28 +88,28 @@ def main():
         frame = cv2.imread(str(img_path))
         if frame is None:
             continue
+
+        # pose -> per-person head ROI from face keypoints
         pr = pose.predict(frame, conf=CONF, verbose=False)[0]
         persons = []
         if pr.keypoints is not None and pr.boxes is not None:
             for pid, (box, kp) in enumerate(zip(pr.boxes.xyxy.cpu().numpy(),
                                                 pr.keypoints.data.cpu().numpy())):
                 pbox = tuple(int(v) for v in box[:4])
-                hbox, _, _ = find_head_box(kp, pbox)
-                persons.append((pid, pbox, hbox))
+                hbox, nkpt, fb = find_head_box(kp, pbox)
+                persons.append((pid, pbox, hbox, fb))
 
-        dets = detections(sh17, frame)
-        n_helmet_box = sum(1 for k, _ in dets if k == "helmet")
-        n_head_box = sum(1 for k, _ in dets if k == "head")
+        helmets = helmet_boxes(sh17, frame)       # SH17 helmet boxes only
         canvas = frame.copy()
         counts = Counter()
-        for pid, pbox, hbox in persons:
-            status, mbox = match_one(hbox, dets)
+        for pid, pbox, hbox, fb in persons:
+            status, mbox = match_one(hbox, fb, helmets)
             draw(canvas, pbox, hbox, status, mbox, pid)
             counts[status] += 1
             tally[status] += 1
         cv2.imwrite(str(OUT / img_path.name), canvas)
-        print(f"{img_path.name}: {len(persons)} persons | SH17 boxes helmet={n_helmet_box} head={n_head_box}"
-              f" | matched helmet={counts['helmet']} no_helmet={counts['no_helmet']} unknown={counts['unknown']}")
+        print(f"{img_path.name}: {len(persons)} persons | SH17 helmets={len(helmets)}"
+              f" | helmet={counts['helmet']} no_helmet={counts['no_helmet']} unknown={counts['unknown']}")
 
     print(f"\nTOTAL  helmet={tally['helmet']}  no_helmet={tally['no_helmet']}  unknown={tally['unknown']}")
     print(f"Saved to {OUT}")
