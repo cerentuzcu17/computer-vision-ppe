@@ -31,6 +31,10 @@ HEAD_BOX_UP_SPANS = 1.4
 HEAD_BOX_DOWN_SPANS = 0.35
 HEAD_BOX_HALF_WIDTH_SPANS = 0.9
 
+# Goggles sit ON the face, not on the crown, so the goggle ROI is a TIGHT box
+# around the face keypoints - we do NOT extend it upward like the helmet box.
+FACE_BOX_PADDING = 0.35
+
 
 def find_head_box(keypoints: np.ndarray, person_box: tuple[int, int, int, int]) -> tuple[tuple[int, int, int, int], int, bool]:
     """
@@ -77,6 +81,63 @@ def find_head_box(keypoints: np.ndarray, person_box: tuple[int, int, int, int]) 
     x1, y1, x2, y2 = person_box
     guessed_box = (x1, y1, x2, y1 + int((y2 - y1) * 0.25))
     return clip_to_box(guessed_box, person_box), len(trusted_points), True
+
+
+def find_face_box(keypoints: np.ndarray, person_box: tuple[int, int, int, int]) -> tuple[tuple[int, int, int, int], bool]:
+    """
+    A tight ROI around the face keypoints, for goggle detection.
+
+    Unlike find_head_box (which reaches up to the crown for a helmet), this
+    stays on the face - that's where goggles are. Returns (face_box, is_guess);
+    is_guess is True when we had no reliable face keypoints and had to fall back.
+    """
+    trusted_points = []
+    for kpt_index in HEAD_KEYPOINTS:
+        x, y, confidence = keypoints[kpt_index]
+        if confidence >= MIN_KEYPOINT_CONFIDENCE:
+            trusted_points.append((x, y))
+
+    if len(trusted_points) >= 2:
+        points = np.array(trusted_points, dtype=np.float32)
+        left, top = points.min(axis=0)
+        right, bottom = points.max(axis=0)
+        span = max(right - left, bottom - top, 1.0)
+        pad = span * FACE_BOX_PADDING
+        face_box = (int(round(left - pad)), int(round(top - pad)),
+                    int(round(right + pad)), int(round(bottom + pad)))
+        return clip_to_box(face_box, person_box), False
+
+    x1, y1, x2, y2 = person_box
+    guessed_box = (x1, y1, x2, y1 + int((y2 - y1) * 0.20))
+    return clip_to_box(guessed_box, person_box), True
+
+
+def is_face_frontal(keypoints: np.ndarray) -> bool:
+    """
+    True if the face is turned toward the camera enough to judge goggles - we
+    require BOTH eyes to be confidently visible. A profile / turned-away face
+    fails this, so the goggle verdict upstream becomes "unknown" rather than a
+    guess (you can't tell whether someone wears goggles from the back of a head).
+    """
+    return (keypoints[LEFT_EYE][2] >= MIN_KEYPOINT_CONFIDENCE and
+            keypoints[RIGHT_EYE][2] >= MIN_KEYPOINT_CONFIDENCE)
+
+
+def best_match(roi: tuple[int, int, int, int], boxes: list[tuple[int, int, int, int]]) -> tuple[int, float]:
+    """
+    Match a detected-object box to an ROI the way the pipeline does: a box whose
+    CENTER falls inside the ROI is a candidate; among candidates the highest IoU
+    wins. Returns (index_of_best_box, iou), or (-1, best_iou_seen) if none match.
+    """
+    best_index, best_inside_iou = -1, 0.0
+    best_seen_iou = 0.0
+    for i, box in enumerate(boxes):
+        iou = intersection_over_union(roi, box)
+        best_seen_iou = max(best_seen_iou, iou)
+        cx, cy = (box[0] + box[2]) // 2, (box[1] + box[3]) // 2
+        if roi[0] <= cx <= roi[2] and roi[1] <= cy <= roi[3] and iou >= best_inside_iou:
+            best_index, best_inside_iou = i, iou
+    return (best_index, best_inside_iou) if best_index >= 0 else (-1, best_seen_iou)
 
 
 def helmet_iou(head_box: tuple[int, int, int, int], helmet_box: tuple[int, int, int, int]) -> float:
