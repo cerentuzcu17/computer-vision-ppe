@@ -30,7 +30,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "core"))
 
 from drawing import draw_person          # noqa: E402
