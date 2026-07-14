@@ -38,17 +38,21 @@ class PpePipeline:
         self.conf = conf
         self.anonymize_method = anonymize_method
 
-    def process(self, frame):
-        """Run the whole pipeline on one BGR frame. Returns (anonymized_frame, list[PersonResult])."""
-        persons = self._detect_people(frame)
+    def process(self, frame, track: bool = False):
+        """Run the whole pipeline on one BGR frame. Returns (anonymized_frame, list[PersonResult]).
+
+        track=True uses Ultralytics' built-in tracker so each person carries a
+        stable track_id across frames (needed for temporal voting on video).
+        """
+        persons = self._detect_people(frame, track=track)
         helmet_boxes, goggle_boxes = self._detect_ppe(frame)
 
         results = []
-        for person, face_box, face_is_guess in persons:
+        for person, face_box, face_is_guess, track_id in persons:
             ppe = PpeStatus()
             self._judge_helmet(ppe, person, helmet_boxes)
             self._judge_goggle(ppe, person, face_box, face_is_guess, goggle_boxes)
-            results.append(PersonResult(person, face_box, ppe))
+            results.append(PersonResult(person, face_box, ppe, track_id))
 
         # Privacy: destroy every face AFTER we're done detecting on the raw frame.
         anonymized = frame.copy()
@@ -59,20 +63,27 @@ class PpePipeline:
 
     # --- stages -------------------------------------------------------------
 
-    def _detect_people(self, frame):
-        """Pose pass -> (Person, face_box, face_is_guess) per detected person."""
-        result = self.pose.predict(frame, conf=self.conf, verbose=False)[0]
+    def _detect_people(self, frame, track: bool = False):
+        """Pose pass -> (Person, face_box, face_is_guess, track_id) per detected person."""
+        if track:
+            result = self.pose.track(frame, conf=self.conf, persist=True, verbose=False)[0]
+        else:
+            result = self.pose.predict(frame, conf=self.conf, verbose=False)[0]
         people = []
         if result.keypoints is None or result.boxes is None:
             return people
         boxes = result.boxes.xyxy.cpu().numpy()
         keypoints = result.keypoints.data.cpu().numpy()
-        for pid, (box, kp) in enumerate(zip(boxes, keypoints)):
+        track_ids = result.boxes.id.int().cpu().tolist() if result.boxes.id is not None else None
+        for i, (box, kp) in enumerate(zip(boxes, keypoints)):
             person_box = tuple(int(v) for v in box[:4])
             head_box, n_kpts, head_is_guess = find_head_box(kp, person_box)
             face_box, face_is_guess = find_face_box(kp, person_box)
-            person = Person(pid, person_box, kp, head_box, n_kpts, head_is_guess)
-            people.append((person, face_box, face_is_guess))
+            track_id = track_ids[i] if track_ids is not None else None
+            # id doubles as the person label when tracking; else just the index
+            person = Person(track_id if track_id is not None else i,
+                            person_box, kp, head_box, n_kpts, head_is_guess)
+            people.append((person, face_box, face_is_guess, track_id))
         return people
 
     def _detect_ppe(self, frame):
