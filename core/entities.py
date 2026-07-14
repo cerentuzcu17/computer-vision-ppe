@@ -46,3 +46,4 @@ class PersonResult:
     person: Person
     face_box: tuple[int, int, int, int]       # tight face ROI (goggle region); also what we anonymize
     ppe: PpeStatus = field(default_factory=PpeStatus)
+    track_id: int | None = None               # stable id across frames (from the tracker); None on stills
