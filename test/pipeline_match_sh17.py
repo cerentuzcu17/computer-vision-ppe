@@ -60,23 +60,33 @@ def center_inside(box, head_box):
 
 
 def match_one(head_box, is_fallback, helmets):
-    """helmet if a helmet box matches the head ROI; else no_helmet (or unknown if the head was only guessed)."""
-    inside = [(box, intersection_over_union(head_box, box)) for box in helmets if center_inside(box, head_box)]
+    """helmet if a helmet box matches the head ROI; else no_helmet (or unknown if the head was only guessed).
+
+    Returns (status, matched_box, iou). For a match, iou is the matched helmet's IoU with the ROI.
+    For a miss, iou is the best IoU across all helmet boxes (usually low / 0), shown to explain the verdict.
+    """
+    scored = [(box, intersection_over_union(head_box, box)) for box in helmets]
+    inside = [(box, iou) for box, iou in scored if center_inside(box, head_box)]
     if inside:
-        best = max(inside, key=lambda d: d[1])
-        return "helmet", best[0]
-    return ("unknown" if is_fallback else "no_helmet"), None
+        best_box, best_iou = max(inside, key=lambda d: d[1])
+        return "helmet", best_box, best_iou
+    best_iou = max((iou for _, iou in scored), default=0.0)
+    return ("unknown" if is_fallback else "no_helmet"), None, best_iou
 
 
-def draw(frame, person, status, mbox):
-    """Draw the full pose (skeleton + keypoints + head box + id) then the helmet verdict."""
+def draw(frame, person, status, mbox, iou):
+    """Draw the full pose (skeleton + keypoints + id), then the head ROI and the IoU-based helmet verdict."""
     draw_person(frame, person)                    # YOLO-pose: body box, skeleton, head keypoints, head box
     col = COLOR[status]
-    hbox = person.head_box
-    cv2.rectangle(frame, hbox[:2], hbox[2:], col, 3)   # head ROI recolored by verdict
+    hx1, hy1, hx2, hy2 = person.head_box
+    cv2.rectangle(frame, (hx1, hy1), (hx2, hy2), col, 3)          # head ROI, colored by verdict
+    cv2.putText(frame, "ROI", (hx1, max(hy1 - 6, 12)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, col, 1, cv2.LINE_AA)
     if mbox is not None:
-        cv2.rectangle(frame, mbox[:2], mbox[2:], col, 2)  # the matched helmet box
-    cv2.putText(frame, f"P{person.person_id}:{status}", (person.box[0], max(person.box[1] - 8, 14)),
+        cv2.rectangle(frame, mbox[:2], mbox[2:], col, 2)          # the matched helmet box
+        cv2.line(frame, ((hx1 + hx2) // 2, (hy1 + hy2) // 2),     # ROI center -> helmet center
+                 ((mbox[0] + mbox[2]) // 2, (mbox[1] + mbox[3]) // 2), col, 1, cv2.LINE_AA)
+    cv2.putText(frame, f"P{person.person_id}:{status} IoU={iou:.2f}",
+                (person.box[0], max(person.box[1] - 8, 14)),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, col, 2, cv2.LINE_AA)
 
 
@@ -105,10 +115,14 @@ def main():
 
         helmets = helmet_boxes(sh17, frame)       # SH17 helmet boxes only
         canvas = frame.copy()
+        for hb in helmets:                        # show every detected helmet (faint) so IoU=0 misses are visible
+            cv2.rectangle(canvas, hb[:2], hb[2:], (235, 235, 235), 1)
+            cv2.putText(canvas, "helmet", (hb[0], max(hb[1] - 4, 10)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (235, 235, 235), 1, cv2.LINE_AA)
         counts = Counter()
         for person in persons:
-            status, mbox = match_one(person.head_box, person.used_fallback_box, helmets)
-            draw(canvas, person, status, mbox)
+            status, mbox, iou = match_one(person.head_box, person.used_fallback_box, helmets)
+            draw(canvas, person, status, mbox, iou)
             counts[status] += 1
             tally[status] += 1
         cv2.imwrite(str(OUT / img_path.name), canvas)

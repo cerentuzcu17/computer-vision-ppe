@@ -22,7 +22,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 CPPE = ROOT / "datasets" / "construction-ppe"
 WORK = ROOT / "datasets" / "_threeway"
 OUT = ROOT / "observe" / "three_way_cppe"

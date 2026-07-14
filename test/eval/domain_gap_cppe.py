@@ -21,7 +21,7 @@ from pathlib import Path
 import cv2
 from ultralytics import YOLO
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 CPPE = ROOT / "datasets" / "construction-ppe"
 EVAL = ROOT / "datasets" / "cppe_eval"           # remapped copy for evaluation
 OUT = ROOT / "observe" / "domain_gap_cppe"
