@@ -28,6 +28,8 @@ from ultralytics import YOLO
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "core"))
 from geometry import find_head_box, intersection_over_union  # noqa: E402
+from entities import Person             # noqa: E402
+from drawing import draw_person         # noqa: E402
 
 SAMPLES = ROOT / "test" / "samples" / "v1"
 OUT = ROOT / "observe" / "pipeline_match_sh17"
@@ -66,13 +68,15 @@ def match_one(head_box, is_fallback, helmets):
     return ("unknown" if is_fallback else "no_helmet"), None
 
 
-def draw(frame, pbox, hbox, status, mbox, pid):
+def draw(frame, person, status, mbox):
+    """Draw the full pose (skeleton + keypoints + head box + id) then the helmet verdict."""
+    draw_person(frame, person)                    # YOLO-pose: body box, skeleton, head keypoints, head box
     col = COLOR[status]
-    cv2.rectangle(frame, pbox[:2], pbox[2:], col, 2)
-    cv2.rectangle(frame, hbox[:2], hbox[2:], col, 2)
+    hbox = person.head_box
+    cv2.rectangle(frame, hbox[:2], hbox[2:], col, 3)   # head ROI recolored by verdict
     if mbox is not None:
-        cv2.rectangle(frame, mbox[:2], mbox[2:], col, 1)
-    cv2.putText(frame, f"P{pid}:{status}", (pbox[0], max(pbox[1] - 8, 14)),
+        cv2.rectangle(frame, mbox[:2], mbox[2:], col, 2)  # the matched helmet box
+    cv2.putText(frame, f"P{person.person_id}:{status}", (person.box[0], max(person.box[1] - 8, 14)),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, col, 2, cv2.LINE_AA)
 
 
@@ -89,7 +93,7 @@ def main():
         if frame is None:
             continue
 
-        # pose -> per-person head ROI from face keypoints
+        # YOLO-pose human detection -> per-person body keypoints + head ROI from the face points
         pr = pose.predict(frame, conf=CONF, verbose=False)[0]
         persons = []
         if pr.keypoints is not None and pr.boxes is not None:
@@ -97,14 +101,14 @@ def main():
                                                 pr.keypoints.data.cpu().numpy())):
                 pbox = tuple(int(v) for v in box[:4])
                 hbox, nkpt, fb = find_head_box(kp, pbox)
-                persons.append((pid, pbox, hbox, fb))
+                persons.append(Person(pid, pbox, kp, hbox, nkpt, fb))
 
         helmets = helmet_boxes(sh17, frame)       # SH17 helmet boxes only
         canvas = frame.copy()
         counts = Counter()
-        for pid, pbox, hbox, fb in persons:
-            status, mbox = match_one(hbox, fb, helmets)
-            draw(canvas, pbox, hbox, status, mbox, pid)
+        for person in persons:
+            status, mbox = match_one(person.head_box, person.used_fallback_box, helmets)
+            draw(canvas, person, status, mbox)
             counts[status] += 1
             tally[status] += 1
         cv2.imwrite(str(OUT / img_path.name), canvas)
