@@ -19,6 +19,13 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
+import os
+from core.security import ImageEncryptor
+
+# Static secret key for prototyping. Must be moved to a secure .env file in production.
+SECRET_KEY = b'vK9_X1zY7b_NMoP83fL_TkWq4vE9mZaR_BcDeFgHiJk='
+encryptor = ImageEncryptor(key=SECRET_KEY)
+
 # --- COCO pose keypoint indices ---------------------------------------------
 # 0=nose, 1=left eye, 2=right eye, 3=left ear, 4=right ear
 HEAD_KPT_IDS = (0, 1, 2, 3, 4)
