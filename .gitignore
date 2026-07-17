@@ -186,7 +186,7 @@ cython_debug/
 #   be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
 #   and can be added to the global gitignore or merged into this file.  For a more nuclear
 #   option (not recommended) you can uncomment the following to ignore the entire idea folder.
-# .idea/
+.idea/
 
 # Abstra
 #   Abstra is an AI-powered process automation framework.
@@ -218,16 +218,28 @@ __marimo__/
 .streamlit/secrets.toml
 
 # --- Project-specific ---
-# Model weights (large binaries, auto-download)
-model/*.pt
+# Model weights (.pt) are versioned via Git LFS so every dev gets the exact
+# same models on pull. Derived/exported formats stay out - regenerate locally.
 model/*.onnx
 model/*.engine
 !model/.gitkeep
+
+# Test/placeholder models (third-party weights, only for validating the pipeline).
+# The .pt weights are shared via LFS; ignore anything else that lands here.
+model/test/*
+!model/test/.gitkeep
+!model/test/*.pt
 
 # Raw data / test media (large files stay out of the repo)
 dataset/*
 !dataset/.gitkeep
 !dataset/README.md
+
+# Downloaded / derived datasets (e.g. Construction-PPE) — never committed
+datasets/
+
+# External / third-party model weights (e.g. SH17 - non-commercial license) — never committed
+model/external/
 
 # Run outputs (processed images/video, logs)
 observe/*
