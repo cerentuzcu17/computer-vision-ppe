@@ -221,15 +221,20 @@ def log_person(person: Person) -> None:
     )
 
 
-def process_frame(model: YOLO, frame: np.ndarray, conf: float) -> np.ndarray:
-    """Process a single frame: infer -> draw -> log. Returns the annotated frame."""
+def process_frame(model: YOLO, frame: np.ndarray, conf: float) -> tuple[np.ndarray, bytes]:
     result = model.predict(frame, conf=conf, verbose=False)[0]
     people = build_people(result)
     print(f"[frame] people detected: {len(people)}")
+    
+    # KVKK Compliance: Clone and encrypt the clean, unannotated RAW frame
+    raw_frame_copy = frame.copy()
+    encrypted_bytes = encryptor.encrypt_frame(raw_frame_copy)
+    
     for person in people:
         draw_person(frame, person)
         log_person(person)
-    return frame
+        
+    return frame, encrypted_bytes
 
 
 # --- Input handling -----------------------------------------------------
@@ -248,10 +253,19 @@ def run(source: str, weights: str, conf: float, save: str | None, show: bool) ->
         frame = cv2.imread(source)
         if frame is None:
             raise FileNotFoundError(f"Could not read image: {source}")
-        out = process_frame(model, frame, conf)
+        
+        # Unpack the tuple containing the annotated frame and encrypted raw bytes
+        out, enc_data = process_frame(model, frame, conf)
         if save:
             cv2.imwrite(save, out)
+            
+            # Save the encrypted raw image with a .enc extension
+            enc_save_path = os.path.splitext(save)[0] + "_raw.enc"
+            with open(enc_save_path, "wb") as f:
+                f.write(enc_data)
             print(f"[saved] {save}")
+            print(f"[KVKK SECURE] Encrypted raw image saved to: {enc_save_path}")
+            
         if show:
             cv2.imshow("pose_prototype", out)
             cv2.waitKey(0)
