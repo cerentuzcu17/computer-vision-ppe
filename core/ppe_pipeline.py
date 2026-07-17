@@ -12,8 +12,18 @@ The privacy-aware PPE pipeline, end to end.
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from ultralytics import YOLO
+
+# Make imports resolve no matter how this file is launched: add both this dir
+# (for the sibling modules below) and the repo root (for the `core.security`
+# package). Without the repo root, `from core.security import ...` fails, gets
+# swallowed by the except below, and encryption silently turns off.
+_HERE = Path(__file__).resolve().parent
+for _p in (str(_HERE), str(_HERE.parent)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from entities import Person, PersonResult, PpeStatus, YES, NO, UNKNOWN
 from geometry import find_head_box, find_face_box, is_face_frontal, best_match
@@ -22,7 +32,10 @@ from privacy import anonymize_face
 try:
     from core.security import ImageEncryptor
     _SECURITY_AVAILABLE = True
-except ImportError:
+except ImportError as _e:
+    # Make this LOUD — a silent failure here means frames go out unencrypted.
+    print(f"[SECURITY WARNING] Encryption unavailable ({_e}); "
+          "raw frames will NOT be encrypted.")
     _SECURITY_AVAILABLE = False
 
 # SH17 class ids (the detector we use for now). helmet=10, glasses=8.

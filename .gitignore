@@ -1,3 +1,12 @@
+# --- Security / KVKK ---
+# Encryption keys must NEVER be committed. The private key especially — it can
+# decrypt every worker image ever captured.
+keys/
+*.key
+*.pub
+# Encrypted site images (should live in a store, not the repo)
+*.enc
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
